@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Chart with a Dynamic Backend</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style type="text/css">
+            #chartHolder {
+                margin-left: auto;
+                margin-right: auto;
+                margin-top: 20px;
+                width:600px;
+                height:400px;
+            }
+        </style>
+        <!--Load the AJAX API-->
+        <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+        <script type="text/javascript">
+           // log("Loading APIs...");  
+            // Load the Visualization API and the piechart package.
+            google.load('visualization', '1.1', {'packages': ['bar']});
+
+            // Set a callback to run when the Google Visualization API is loaded.
+            google.setOnLoadCallback(drawChart);
+
+            // Callback that creates and populates a data table,
+            // instantiates the bar chart, passes in the data and
+            // draws it.
+            function drawChart() {
+                //log("Done Loading APIs...");
+                // Instantiate and draw our chart, passing in some options.
+                var chart = new google.charts.Bar(document.getElementById('chartHolder'));
+                // Set chart options
+                var options = {
+                    chart: {
+                        'title': 'Variation of Work as the week progresses',
+                        'subtitle':'Actual vs Estimated'
+                                
+                    },
+                    bars: 'vertical',
+                    animation:{
+                        duration: 1000,
+                        easing: 'out',
+                      },
+                    
+                };
+                
+                //Set up the data...
+                var drawingData = new google.visualization.DataTable();
+                drawingData.addColumn('string', 'WeekDay');
+                drawingData.addColumn('number','Estimated Working Hours')
+                drawingData.addColumn('number', 'Actual Working Hours');
+                //add 5 empty rows
+                for(var i=0;i<5;i++)
+                    drawingData.addRow(['',0,0]);
+                
+                //create a websocket and fetch the data.
+                // Create a new instance of the websocket
+                var webSocket = new WebSocket("ws://localhost:8080/SocketCharts/chartServer");
+                
+                //register onOpen
+                webSocket.onopen = function(event) {
+                    //document.getElementById("status").innerHTML("opened");
+                    log("Connected to ChartServer Websocket Endpoint...");
+                    window.onbeforeunload = function() {
+                        webSocket.close();
+                    }
+                    window.onclose = function() {
+                        webSocket.close();
+                    }
+                    webSocket.send("Hello Server");  
+                    
+                    
+                }
+                
+                webSocket.onmessage = function(event) {
+                    log("Server Says: <p>"+event.data+"</p>");
+                    //Now instruct Drawing.
+                    chart.draw(createDataSet(eval(event.data),drawingData), options);
+                    
+                }
+                
+                webSocket.onclose = function(event) {
+                    console.log("closed!");
+                    log("Ending Connection!");
+                }
+                setTimeout(function() {
+                  
+                },3000);
+
+            }
+            
+            function createDataSet(serverData,drawingData) {
+                
+                //loop through and then add data
+                for(i=0;i<serverData.length;i++) {
+                    drawingData.setValue(i,0,serverData[i].day);
+                    drawingData.setValue(i,1,serverData[i].estimated);
+                    drawingData.setValue(i,2,serverData[i].actual);
+                    
+                }
+                return drawingData;
+            }
+            function log(message) {
+                var logger = document.getElementById("status");
+                logger.innerHTML = message;
+            }
+            
+            //drawChart();
+        </script>
+    </head>
+    <body>
+        <h2>JADE Estimate vs Actual Work </h2>
+        <hr/>
+        <div id="chartHolder"></div>
+        <hr/>
+        
+        <div id="status"></div>
+    </body>
+</html>
